@@ -1,31 +1,39 @@
-// Define a region of interest as a point, adjust the coordinates to your location of interest.
-var point = ee.Geometry.Point(-98.484246, 39.011902);
+// Define a region of interest as a point - adjust the coordinates to your location of interest in the US.
+var point = ee.Geometry.Point(-98.484246, 39.011902); // Example coordinates for Kansas
+var bufferedRegion = point.buffer(10000); // Buffer by 10 km to capture surrounding fields
 
 // Define the time range for your analysis
 var startYear = 2018;
 var endYear = 2021;
 
-// Load the CDL dataset for wheat classes
+// Load the CDL dataset
 var cdl = ee.ImageCollection("USDA/NASS/CDL")
              .filter(ee.Filter.calendarRange(startYear, endYear, 'year'))
              .select(['cropland']);
 
-// Filter the CDL dataset for winter wheat (class 24) and double crop (class 26) - if relevant for your region
-var winterWheat = cdl.map(function(image) {
-  return image.eq(24).or(image.eq(26)).selfMask();
-});
+// Function to calculate the area for a given crop class (band value)
+function calculateCropArea(cropClass, colorHex, label) {
+  var cropArea = cdl.map(function(image) {
+    return image.eq(cropClass).selfMask();
+  }).sum().multiply(ee.Image.pixelArea()).divide(1e4); // Area in hectares
+  
+  var totalCropArea = cropArea.reduceRegion({
+    reducer: ee.Reducer.sum(),
+    geometry: bufferedRegion,
+    scale: 30,
+    maxPixels: 1e9
+  }).get('cropland');
+  
+  totalCropArea.evaluate(function(result) {
+    print(label + ' Area (hectares) - ' + colorHex + ':', result);
+  });
+}
 
-// Sum the areas for each year and divide by the number of years to get an average area per year
-var wheatArea = winterWheat.sum().divide(endYear - startYear + 1).multiply(ee.Image.pixelArea());
+// Calculate areas for Spring Wheat (class 23), Winter Wheat (class 24), and Durum Wheat
+calculateCropArea(23, '#d8b56b', 'Spring Wheat');
+calculateCropArea(24, '#a57000', 'Winter Wheat');
+calculateCropArea(22, '#896054', 'Durum Wheat'); // Assuming the class value for Durum Wheat is 22
 
-// Calculate total area for winter wheat
-var totalArea = wheatArea.reduceRegion({
-  reducer: ee.Reducer.sum(),
-  geometry: point,
-  scale: 30, // Adjust scale if necessary for your analysis
-  maxPixels: 1e9
-});
-print('Average Winter Wheat Area (sq meters)', totalArea);
 
 // Load a temperature dataset such as MODIS Land Surface Temperature
 var temperature = ee.ImageCollection("MODIS/006/MOD11A2")
@@ -44,6 +52,11 @@ var radiation = ee.ImageCollection("NASA/GLDAS/V021/NOAH/G025/T3H")
                  .select('SWdown_f_tavg'); // Corrected band name
                  //Shortwave radiation downwards
 
+var tempToCelsius = function(image) {
+  // MODIS LST data are in Kelvin and scaled by 0.02; thus, we divide by 50, then subtract 273.15 to convert to Celsius.
+  return image.multiply(0.02).subtract(273.15).set('system:time_start', image.get('system:time_start'));
+};
+
 // Calculate average daily solar radiation during the spring and winter seasons
 var avgSpringRadiation = radiation.filter(ee.Filter.dayOfYear(91, 182)).mean();
 var avgWinterRadiation = radiation.filter(ee.Filter.dayOfYear(274, 365)).mean();
@@ -56,9 +69,42 @@ var getRadiationStats = function(image, label) {
     scale: 30,
     maxPixels: 1e9
   });
-  print(label, stats.get('SWdown'));
+  print(label, stats.get('SWdown_f_tavg'));
 };
+// ... (other code)
+
+// Convert the temperature collection to Celsius
+var temperatureCelsius = temperature.map(tempToCelsius);
+
+// Function to create a time series chart of temperature
+function createTempChart(tempCollection, seasonName) {
+  var tempChart = ui.Chart.image.series({
+    imageCollection: tempCollection,
+    region: bufferedRegion,
+    reducer: ee.Reducer.mean(),
+    scale: 1000
+  }).setOptions({
+    title: seasonName + ' Temperature Over Time',
+    vAxis: {title: 'Temperature (Celsius)'},
+    hAxis: {title: 'Time'},
+    lineWidth: 1,
+    pointSize: 3,
+    series: {0: {color: 'FF0000'}} // Color the line red for visibility
+  });
+  
+  print(tempChart);
+}
+
+// Create temperature charts for the spring and winter seasons
+var tempDuringSpring = temperatureCelsius.filter(ee.Filter.dayOfYear(91, 182)); // Spring: April to June
+createTempChart(tempDuringSpring, 'Spring');
+
+var tempDuringWinter = temperatureCelsius.filter(ee.Filter.dayOfYear(274, 365)); // Winter: October to December
+createTempChart(tempDuringWinter, 'Winter');
+
+// ... (other code)
+
 
 // Print average solar radiation for spring and winter
-getRadiationStats(avgSpringRadiation, 'Average Spring Solar Radiation (W/m^2)');
-getRadiationStats(avgWinterRadiation, 'Average Winter Solar Radiation (W/m^2)');
+getRadiationStats(avgSpringRadiation, 'Average Intensity of Sunlight (b/w 200-600) (W/m^2)');
+getRadiationStats(avgWinterRadiation, 'Average Intensity of Sunlight (b/w 200-600) (W/m^2)');
