@@ -1,73 +1,64 @@
-// Define a region of interest as a point
-var point = ee.Geometry.Point(-105.077209, 39.766098);
+// Define a region of interest as a point, adjust the coordinates to your location of interest.
+var point = ee.Geometry.Point(-98.484246, 39.011902);
 
-// Load Sentinel-2 Surface Reflectance collection
-var collection = ee.ImageCollection('COPERNICUS/S2_SR')
-  .filterBounds(point)
-  .filterDate('2020-01-01', '2022-12-31')
-  .sort('system:time_start')
-  .map(function(image) {
-    var timestamp = ee.Date(image.get('system:time_start')).format('YYYY-MM-dd');
-    return image.set('system:time_start', timestamp);
-  });
+// Define the time range for your analysis
+var startYear = 2018;
+var endYear = 2021;
 
-// Print the collection to verify that the "system:time_start" property is being set
-print(collection);
+// Load the CDL dataset for wheat classes
+var cdl = ee.ImageCollection("USDA/NASS/CDL")
+             .filter(ee.Filter.calendarRange(startYear, endYear, 'year'))
+             .select(['cropland']);
 
-// Display the image
-var visParams = {bands: ['B4', 'B3', 'B2'], max: 3000};
-Map.centerObject(point, 12);
-Map.addLayer(collection.median(), visParams, 'Median RGB');
-
-// Add water mask
-var waterThreshold = 1200; // adjust this threshold as per your requirements
-var ndwi = collection
-  .map(function(image) {
-    return image.normalizedDifference(['B3', 'B8']).rename('NDWI');
-  })
-  .median();
-var waterMask = ndwi.lt(waterThreshold); // create a mask for pixels below threshold
-Map.addLayer(waterMask.updateMask(waterMask), {palette:'blue'}, 'Water mask');
-
-// Load the GLEAM dataset and filter by date
-var gleam = ee.ImageCollection('JRC/GSW1_2/YearlyHistory')
-    .filter(ee.Filter.date('2020-01-01', '2022-12-31'))
-    .select('waterClass');
-
-// Define the colors to use for each water class
-var colors = ['white', 'blue', 'lightblue', 'green', 'yellow', 'orange', 'red', 'brown'];
-
-// Add the groundwater level mapping to the map
-var glMapping = gleam.max().visualize({palette: colors});
-Map.addLayer(glMapping, {}, 'Groundwater Level Mapping');
-
-// Reduce the water mask to a single value representing the percentage of the area covered by water
-var waterPercentage = waterMask.reduceRegion({
-  reducer: ee.Reducer.mean(),
-  geometry: point,
-  scale: 10,
-  maxPixels: 1e9
-}).get('NDWI');
-
-// Print the water percentage to the console
-print('Water percentage:', waterPercentage);
-
-// Create a chart showing the groundwater level over time
-var chart = ui.Chart.image.series({
-  imageCollection: collection,
-  region: point,
-  reducer: ee.Reducer.mean(),
-  scale: 10,
-  xProperty: 'system:time_start' // Use 'system:time_start' as the x-axis property
-}).setOptions({
-  title: 'Groundwater Level over Time',
-  vAxis: {title: 'Groundwater Level (dB)'},
-  hAxis: {title: 'Date'},
-  lineWidth: 1,
-  pointSize: 3
+// Filter the CDL dataset for winter wheat (class 24) and double crop (class 26) - if relevant for your region
+var winterWheat = cdl.map(function(image) {
+  return image.eq(24).or(image.eq(26)).selfMask();
 });
 
-// Display the chart
-print(chart);
+// Sum the areas for each year and divide by the number of years to get an average area per year
+var wheatArea = winterWheat.sum().divide(endYear - startYear + 1).multiply(ee.Image.pixelArea());
 
-//WOHOO!
+// Calculate total area for winter wheat
+var totalArea = wheatArea.reduceRegion({
+  reducer: ee.Reducer.sum(),
+  geometry: point,
+  scale: 30, // Adjust scale if necessary for your analysis
+  maxPixels: 1e9
+});
+print('Average Winter Wheat Area (sq meters)', totalArea);
+
+// Load a temperature dataset such as MODIS Land Surface Temperature
+var temperature = ee.ImageCollection("MODIS/006/MOD11A2")
+                   .filter(ee.Filter.date(ee.Date.fromYMD(startYear, 1, 1), ee.Date.fromYMD(endYear, 12, 31)))
+                   .select('LST_Day_1km');
+
+/// Convert temperature from Kelvin to Celsius, and calculate average temperature during the spring and winter seasons
+var tempToCelsius = function(image) {
+  // MODIS LST data are in Kelvin and scaled by 0.02; thus, we divide by 50, then subtract 273.15 to convert to Celsius.
+  return image.multiply(0.02).subtract(273.15).set('system:time_start', image.get('system:time_start'));
+};
+
+// Modify the band name for solar radiation
+var radiation = ee.ImageCollection("NASA/GLDAS/V021/NOAH/G025/T3H")
+                 .filter(ee.Filter.date(ee.Date.fromYMD(startYear, 1, 1), ee.Date.fromYMD(endYear, 12, 31)))
+                 .select('SWdown_f_tavg'); // Corrected band name
+                 //Shortwave radiation downwards
+
+// Calculate average daily solar radiation during the spring and winter seasons
+var avgSpringRadiation = radiation.filter(ee.Filter.dayOfYear(91, 182)).mean();
+var avgWinterRadiation = radiation.filter(ee.Filter.dayOfYear(274, 365)).mean();
+
+// Reduce the region to get average radiation values
+var getRadiationStats = function(image, label) {
+  var stats = image.reduceRegion({
+    reducer: ee.Reducer.mean(),
+    geometry: point,
+    scale: 30,
+    maxPixels: 1e9
+  });
+  print(label, stats.get('SWdown'));
+};
+
+// Print average solar radiation for spring and winter
+getRadiationStats(avgSpringRadiation, 'Average Spring Solar Radiation (W/m^2)');
+getRadiationStats(avgWinterRadiation, 'Average Winter Solar Radiation (W/m^2)');
