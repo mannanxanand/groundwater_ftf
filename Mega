@@ -248,3 +248,5 @@ var rootZoneSoilMoistureValue = meanRootZoneSoilMoisture.reduceRegion({
 
 print('Surface Soil Moisture Value (b/w 0.2-0.3:', surfaceSoilMoistureValue);
 print('Root Zone Soil Moisture Value (b/w 0.2-0.3:', rootZoneSoilMoistureValue);
+
+// Mannan A - Fear the Fork
