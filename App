@@ -1,57 +1,52 @@
-// Authenticate using a popup.
-// Initialize the Earth Engine client.
-// Your code goes here.
-
 var map = ui.Map();
-map.setCenter(-98.5795, 39.8283, 4); // Center on the United States
-ui.root.clear(); // Clear the default panels
-ui.root.add(map); // Add the map to the UI
+map.style().set('cursor', 'crosshair'); // Change cursor style for point selection
 
+// Create a panel to hold the charts and text outputs
 var outputPanel = ui.Panel({
-  style: {width: '300px', padding: '8px'}
+  style: {width: '400px', padding: '8px'}
 });
-ui.root.add(outputPanel); // Add the output panel to the UI
+outputPanel.add(ui.Label('Click on the map to select an area of interest'));
 
-function printToPanel(content) {
-  if (content instanceof ui.Widget) {
-    outputPanel.add(content);
-  } else {
-    outputPanel.add(ui.Label(content.toString()));
-  }
+// Set up the layout
+ui.root.clear();
+ui.root.setLayout(ui.Panel.Layout.Flow('horizontal'));
+ui.root.add(map);
+ui.root.add(outputPanel);
+
+// Function to update the UI based on the selected point
+function updateUI(point) {
+  outputPanel.clear(); // Clear previous outputs
 }
-
-// Custom base map style (optional)
-var basemapStyle = [
-  // Base map style configurations
-];
-map.setOptions('Custom Style', { 'Custom Style': basemapStyle });
-
 // Define a region of interest as a point
-var point = ee.Geometry.Point(-105.077209, 39.766098);
+var pointOfInterest = ee.Geometry.Point(-105.077209, 39.766098);
+
+// Adjust the filter date for specific wheat farming seasons over 2-4 years, considering winter wheat
+var startYear = 2018; // Example start year
+var endYear = 2021; // Example end year, adjust according to your needs
 
 // Load CDL dataset for wheat (class 24 and 26 for winter wheat and double crop)
 var cdl = ee.ImageCollection("USDA/NASS/CDL")
-  .filter(ee.Filter.calendarRange(2018, 2021, 'year'))
-  .select(['cropland'])
-  .map(function(image) {
-    return image.eq(24).or(image.eq(26)).selfMask();
-  });
+             .filter(ee.Filter.calendarRange(startYear, endYear, 'year'))
+             .select(['cropland'])
+             .map(function(image) {
+               return image.eq(24).or(image.eq(26)).selfMask();
+             });
 
 // Visualize the CDL data on the map to identify wheat farming areas
-map.addLayer(cdl.sum(), {min: 0, max: 4, palette: ['yellow', 'green']}, 'Wheat Farming Areas');
+Map.addLayer(cdl.sum(), {min: 0, max: endYear-startYear, palette: ['yellow', 'green']}, 'Wheat Farming Areas');
 
 // For water availability, consider integrating a precipitation dataset, like CHIRPS
 var precipitation = ee.ImageCollection("UCSB-CHG/CHIRPS/DAILY")
-  .filterDate(ee.Date.fromYMD(2018, 4, 1), ee.Date.fromYMD(2021, 7, 31));
+                      .filterDate(ee.Date.fromYMD(startYear, 4, 1), ee.Date.fromYMD(endYear, 7, 31));
 
 // Calculate and visualize total precipitation during the wheat seasons
 var totalPrecipitation = precipitation.sum();
-map.addLayer(totalPrecipitation, {min: 0, max: 2000, palette: ['blue', 'limegreen', 'yellow']}, 'Total Precipitation');
+Map.addLayer(totalPrecipitation, {min: 0, max: 2000, palette: ['blue', 'limegreen', 'yellow']}, 'Total Precipitation');
 
 // Generate a graph for precipitation over time
 var precipChart = ui.Chart.image.series({
   imageCollection: precipitation,
-  region: point,
+  region: pointOfInterest,
   reducer: ee.Reducer.sum(),
   scale: 5000,
   xProperty: 'system:time_start'
@@ -63,57 +58,103 @@ var precipChart = ui.Chart.image.series({
   pointSize: 3
 });
 
-// Display the precipitation chart in the output panel
-printToPanel(precipChart);
+// Display the precipitation chart
+outputPanel.add(precipChart);
+
+// Adjust the filter date for specific wheat farming seasons over 2-4 years, considering winter wheat
+var startYear = 2018; // Example start year
+var endYear = 2021; // Example end year, adjust according to your needs
+
+// Load CDL dataset for wheat (class 24 and 26 for winter wheat and double crop)
+var cdl = ee.ImageCollection("USDA/NASS/CDL")
+             .filter(ee.Filter.calendarRange(startYear, endYear, 'year'))
+             .select(['cropland'])
+             .map(function(image) {
+               return image.eq(24).or(image.eq(26)).selfMask();
+             });
+
+// Visualize the CDL data on the map to identify wheat farming areas
+Map.addLayer(cdl.sum(), {min: 0, max: endYear-startYear, palette: ['yellow', 'green']}, 'Wheat Farming Areas');
+
+// For water availability, consider integrating a precipitation dataset, like CHIRPS
+var precipitation = ee.ImageCollection("UCSB-CHG/CHIRPS/DAILY")
+                      .filterDate(ee.Date.fromYMD(startYear, 4, 1), ee.Date.fromYMD(endYear, 7, 31));
+
+// Calculate and visualize total precipitation during the wheat seasons
+var totalPrecipitation = precipitation.sum();
+Map.addLayer(totalPrecipitation, {min: 0, max: 2000, palette: ['blue', 'limegreen', 'yellow']}, 'Total Precipitation');
+
+// No change needed in the graph generation part as it correctly shows total precipitation over time.
+
+// Define the spring wheat growing season
+var springStart = '04-01';
+var springEnd = '07-31';
+
+// Define the winter wheat growing season
+var winterStart = '09-01';
+var winterEnd = '06-30';
+
+// Calculate total precipitation for the spring wheat season
+var springPrecipitation = precipitation.filter(ee.Filter.date(ee.Date.fromYMD(startYear, 4, 1), ee.Date.fromYMD(endYear, 7, 31)));
+var totalSpringPrecipitation = springPrecipitation.sum();
+
+// Calculate total precipitation for the winter wheat season spanning years
+var winterPrecipitation = precipitation.filter(ee.Filter.date(ee.Date.fromYMD(startYear - 1, 9, 1), ee.Date.fromYMD(endYear, 6, 30)));
+var totalWinterPrecipitation = winterPrecipitation.sum();
 
 // Function to calculate and print total precipitation for spring and winter wheat
 function printTotalPrecipitation(image, label) {
   var totalPrecipitation = image.reduceRegion({
     reducer: ee.Reducer.sum(),
-    geometry: point,
+    geometry: pointOfInterest,
     scale: 5000,
     maxPixels: 1e9
-  });
+  }).values().get(0);
 
-  totalPrecipitation.evaluate(function(result) {
-    printToPanel(label + ': ' + (result.cropland || 0).toFixed(2) + ' mm');
-  });
+ totalPrecipitation.evaluate(function(result) {
+  var labelText = label + ': ' + (result || 0).toFixed(2) + ' mm';
+  outputPanel.add(ui.Label(labelText));
+});
 }
 
 // Print total precipitation for Spring and Winter Wheat
-var springPrecipitation = precipitation.filter(ee.Filter.date(ee.Date.fromYMD(2018, 4, 1), ee.Date.fromYMD(2021, 7, 31)));
-var totalSpringPrecipitation = springPrecipitation.sum();
-
-var winterPrecipitation = precipitation.filter(ee.Filter.date(ee.Date.fromYMD(2017, 9, 1), ee.Date.fromYMD(2021, 6, 30)));
-var totalWinterPrecipitation = winterPrecipitation.sum();
-
 printTotalPrecipitation(totalSpringPrecipitation, 'Total Spring Wheat Precipitation');
 printTotalPrecipitation(totalWinterPrecipitation, 'Total Winter Wheat Precipitation');
 
-var bufferedRegion = point.buffer(10000); // Buffer by 10 km to capture surrounding fields
+var bufferedRegion = pointOfInterest.buffer(10000); // Buffer by 10 km to capture surrounding fields
 
-// Function to calculate and display crop areas
+// Define the time range for your analysis
+var startYear = 2018;
+var endYear = 2021;
+
+// Load the CDL dataset
+var cdl = ee.ImageCollection("USDA/NASS/CDL")
+             .filter(ee.Filter.calendarRange(startYear, endYear, 'year'))
+             .select(['cropland']);
+
+// Function to calculate the area for a given crop class (band value)
 function calculateCropArea(cropClass, colorHex, label) {
   var cropArea = cdl.map(function(image) {
     return image.eq(cropClass).selfMask();
-  }).sum().multiply(ee.Image.pixelArea()).divide(1e4); // Convert to hectares
-
+  }).sum().multiply(ee.Image.pixelArea()).divide(1e4); // Area in hectares
+  
   var totalCropArea = cropArea.reduceRegion({
     reducer: ee.Reducer.sum(),
     geometry: bufferedRegion,
     scale: 30,
     maxPixels: 1e9
-  });
-
-  totalCropArea.evaluate(function(result) {
-    printToPanel(label + ' Area (hectares): ' + (result.cropland || 0).toFixed(2));
-  });
+  }).get('cropland');
+  
+totalCropArea.evaluate(function(result) {
+  var labelText = label + ' Area (hectares) - ' + colorHex + ': ' + result;
+  outputPanel.add(ui.Label(labelText));
+});
 }
 
-// Calculate areas for specific crop types
+// Calculate areas for Spring Wheat (class 23), Winter Wheat (class 24), and Durum Wheat
 calculateCropArea(23, '#d8b56b', 'Spring Wheat');
 calculateCropArea(24, '#a57000', 'Winter Wheat');
-calculateCropArea(22, '#896054', 'Durum Wheat');
+calculateCropArea(22, '#896054', 'Durum Wheat'); // Assuming the class value for Durum Wheat is 22
 
 
 // Load a temperature dataset such as MODIS Land Surface Temperature
@@ -146,13 +187,16 @@ var avgWinterRadiation = radiation.filter(ee.Filter.dayOfYear(274, 365)).mean();
 var getRadiationStats = function(image, label) {
   var stats = image.reduceRegion({
     reducer: ee.Reducer.mean(),
-    geometry: point,
+    geometry: pointOfInterest,
     scale: 30,
     maxPixels: 1e9
+  }).get('SWdown_f_tavg');
+
+  stats.evaluate(function(value) {
+    var labelText = label + ': ' + value;
+    outputPanel.add(ui.Label(labelText));
   });
-  printToPanel(label, stats.get('SWdown_f_tavg'));
 };
-// ... (other code)
 
 // Convert the temperature collection to Celsius
 var temperatureCelsius = temperature.map(tempToCelsius);
@@ -173,7 +217,7 @@ function createTempChart(tempCollection, seasonName) {
     series: {0: {color: 'FF0000'}} // Color the line red for visibility
   });
   
-  printToPanel(tempChart);
+  outputPanel.add(tempChart);
 }
 
 // Create temperature charts for the spring and winter seasons
@@ -190,9 +234,6 @@ createTempChart(tempDuringWinter, 'Winter');
 getRadiationStats(avgSpringRadiation, 'Average Intensity of Sunlight (b/w 200-600) (W/m^2)');
 getRadiationStats(avgWinterRadiation, 'Average Intensity of Sunlight (b/w 200-600) (W/m^2)');
 
-
-// Define your point of interest with longitude and latitude
-var pointOfInterest = ee.Geometry.Point(-98.484246, 39.011902);
 
 // Import the SMAP soil moisture data
 var dataset = ee.ImageCollection('NASA/SMAP/SPL4SMGP/007')
@@ -211,19 +252,21 @@ Map.addLayer(meanSurfaceSoilMoisture, {min: 0, max: 0.5, palette: ['blue', 'gree
 Map.addLayer(meanRootZoneSoilMoisture, {min: 0, max: 0.5, palette: ['lightblue', 'lightgreen', 'lightyellow', 'pink']}, 'Mean Root Zone Soil Moisture');
 Map.centerObject(pointOfInterest, 10);
 
-var surfaceSoilMoistureValue = meanSurfaceSoilMoisture.reduceRegion({
+meanSurfaceSoilMoisture.reduceRegion({
   reducer: ee.Reducer.mean(),
   geometry: pointOfInterest,
   scale: 10000
-}).get('sm_surface').getInfo();
+}).get('sm_surface').evaluate(function(value) {
+  var labelText = 'Surface Soil Moisture Value (b/w 0.2-0.3): ' + value;
+  outputPanel.add(ui.Label(labelText));
+});
 
-var rootZoneSoilMoistureValue = meanRootZoneSoilMoisture.reduceRegion({
+meanRootZoneSoilMoisture.reduceRegion({
   reducer: ee.Reducer.mean(),
   geometry: pointOfInterest,
   scale: 10000
-}).get('sm_rootzone').getInfo();
-
-printToPanel('Surface Soil Moisture Value (b/w 0.2-0.3:', surfaceSoilMoistureValue);
-printToPanel('Root Zone Soil Moisture Value (b/w 0.2-0.3:', rootZoneSoilMoistureValue);
-
+}).get('sm_rootzone').evaluate(function(value) {
+  var labelText = 'Root Zone Soil Moisture Value (b/w 0.2-0.3): ' + value;
+  outputPanel.add(ui.Label(labelText));
+});
 // Mannan A - Fear the Fork
