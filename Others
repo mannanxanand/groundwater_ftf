@@ -36,7 +36,7 @@ calculateCropArea(22, '#896054', 'Durum Wheat'); // Assuming the class value for
 
 
 // Load a temperature dataset such as MODIS Land Surface Temperature
-var temperature = ee.ImageCollection("MODIS/006/MOD11A2")
+var temperature = ee.ImageCollection('MODIS/061/MOD11A2')
                    .filter(ee.Filter.date(ee.Date.fromYMD(startYear, 1, 1), ee.Date.fromYMD(endYear, 12, 31)))
                    .select('LST_Day_1km');
 
@@ -108,3 +108,39 @@ createTempChart(tempDuringWinter, 'Winter');
 // Print average solar radiation for spring and winter
 getRadiationStats(avgSpringRadiation, 'Average Intensity of Sunlight (b/w 200-600) (W/m^2)');
 getRadiationStats(avgWinterRadiation, 'Average Intensity of Sunlight (b/w 200-600) (W/m^2)');
+
+
+// Define your point of interest with longitude and latitude
+var pointOfInterest = ee.Geometry.Point(-98.484246, 39.011902);
+
+// Import the SMAP soil moisture data
+var dataset = ee.ImageCollection('NASA/SMAP/SPL4SMGP/007')
+                .filter(ee.Filter.date('2020-01-01', '2020-01-10'));
+
+// Select the surface and root zone soil moisture data
+var surfaceSoilMoisture = dataset.select('sm_surface');
+var rootZoneSoilMoisture = dataset.select('sm_rootzone');
+
+// Get the mean soil moisture over the specified period for both layers
+var meanSurfaceSoilMoisture = surfaceSoilMoisture.mean();
+var meanRootZoneSoilMoisture = rootZoneSoilMoisture.mean();
+
+// Add the soil moisture layers to the map with different color palettes for visualization
+Map.addLayer(meanSurfaceSoilMoisture, {min: 0, max: 0.5, palette: ['blue', 'green', 'yellow', 'red']}, 'Mean Surface Soil Moisture');
+Map.addLayer(meanRootZoneSoilMoisture, {min: 0, max: 0.5, palette: ['lightblue', 'lightgreen', 'lightyellow', 'pink']}, 'Mean Root Zone Soil Moisture');
+Map.centerObject(pointOfInterest, 10);
+
+// Print the value of soil moisture at the point of interest for both layers
+var surfaceSoilMoistureValue = meanSurfaceSoilMoisture.reduceRegion({
+  reducer: ee.Reducer.mean(),
+  geometry: pointOfInterest,
+  scale: 10000
+});
+var rootZoneSoilMoistureValue = meanRootZoneSoilMoisture.reduceRegion({
+  reducer: ee.Reducer.mean(),
+  geometry: pointOfInterest,
+  scale: 10000
+});
+
+print('Surface Soil Moisture Value (between 0.2-0.3):', surfaceSoilMoistureValue);
+print('Root Zone Soil Moisture Value (between 0.2-0.3):', rootZoneSoilMoistureValue);
