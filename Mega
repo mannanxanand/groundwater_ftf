@@ -1,0 +1,105 @@
+// Define a region of interest as a point
+var point = ee.Geometry.Point(-105.077209, 39.766098);
+
+// Adjust the filter date for specific wheat farming seasons over 2-4 years, considering winter wheat
+var startYear = 2018; // Example start year
+var endYear = 2021; // Example end year, adjust according to your needs
+
+// Load CDL dataset for wheat (class 24 and 26 for winter wheat and double crop)
+var cdl = ee.ImageCollection("USDA/NASS/CDL")
+             .filter(ee.Filter.calendarRange(startYear, endYear, 'year'))
+             .select(['cropland'])
+             .map(function(image) {
+               return image.eq(24).or(image.eq(26)).selfMask();
+             });
+
+// Visualize the CDL data on the map to identify wheat farming areas
+Map.addLayer(cdl.sum(), {min: 0, max: endYear-startYear, palette: ['yellow', 'green']}, 'Wheat Farming Areas');
+
+// For water availability, consider integrating a precipitation dataset, like CHIRPS
+var precipitation = ee.ImageCollection("UCSB-CHG/CHIRPS/DAILY")
+                      .filterDate(ee.Date.fromYMD(startYear, 4, 1), ee.Date.fromYMD(endYear, 7, 31));
+
+// Calculate and visualize total precipitation during the wheat seasons
+var totalPrecipitation = precipitation.sum();
+Map.addLayer(totalPrecipitation, {min: 0, max: 2000, palette: ['blue', 'limegreen', 'yellow']}, 'Total Precipitation');
+
+// Generate a graph for precipitation over time
+var precipChart = ui.Chart.image.series({
+  imageCollection: precipitation,
+  region: point,
+  reducer: ee.Reducer.sum(),
+  scale: 5000,
+  xProperty: 'system:time_start'
+}).setOptions({
+  title: 'Precipitation over Wheat Season',
+  vAxis: {title: 'Precipitation (mm)'},
+  hAxis: {title: 'Time'},
+  lineWidth: 1,
+  pointSize: 3
+});
+
+// Display the precipitation chart
+print(precipChart);
+
+// Define a region of interest as a point
+var point = ee.Geometry.Point(-105.077209, 39.766098);
+
+// Adjust the filter date for specific wheat farming seasons over 2-4 years, considering winter wheat
+var startYear = 2018; // Example start year
+var endYear = 2021; // Example end year, adjust according to your needs
+
+// Load CDL dataset for wheat (class 24 and 26 for winter wheat and double crop)
+var cdl = ee.ImageCollection("USDA/NASS/CDL")
+             .filter(ee.Filter.calendarRange(startYear, endYear, 'year'))
+             .select(['cropland'])
+             .map(function(image) {
+               return image.eq(24).or(image.eq(26)).selfMask();
+             });
+
+// Visualize the CDL data on the map to identify wheat farming areas
+Map.addLayer(cdl.sum(), {min: 0, max: endYear-startYear, palette: ['yellow', 'green']}, 'Wheat Farming Areas');
+
+// For water availability, consider integrating a precipitation dataset, like CHIRPS
+var precipitation = ee.ImageCollection("UCSB-CHG/CHIRPS/DAILY")
+                      .filterDate(ee.Date.fromYMD(startYear, 4, 1), ee.Date.fromYMD(endYear, 7, 31));
+
+// Calculate and visualize total precipitation during the wheat seasons
+var totalPrecipitation = precipitation.sum();
+Map.addLayer(totalPrecipitation, {min: 0, max: 2000, palette: ['blue', 'limegreen', 'yellow']}, 'Total Precipitation');
+
+// No change needed in the graph generation part as it correctly shows total precipitation over time.
+
+// Define the spring wheat growing season
+var springStart = '04-01';
+var springEnd = '07-31';
+
+// Define the winter wheat growing season
+var winterStart = '09-01';
+var winterEnd = '06-30';
+
+// Calculate total precipitation for the spring wheat season
+var springPrecipitation = precipitation.filter(ee.Filter.date(ee.Date.fromYMD(startYear, 4, 1), ee.Date.fromYMD(endYear, 7, 31)));
+var totalSpringPrecipitation = springPrecipitation.sum();
+
+// Calculate total precipitation for the winter wheat season spanning years
+var winterPrecipitation = precipitation.filter(ee.Filter.date(ee.Date.fromYMD(startYear - 1, 9, 1), ee.Date.fromYMD(endYear, 6, 30)));
+var totalWinterPrecipitation = winterPrecipitation.sum();
+
+// Function to calculate and print total precipitation for spring and winter wheat
+function printTotalPrecipitation(image, label) {
+  var totalPrecipitation = image.reduceRegion({
+    reducer: ee.Reducer.sum(),
+    geometry: point,
+    scale: 5000,
+    maxPixels: 1e9
+  }).values().get(0);
+
+  totalPrecipitation.evaluate(function(result) {
+    print(label + ': ' + (result || 0).toFixed(2) + ' mm');
+  });
+}
+
+// Print total precipitation for Spring and Winter Wheat
+printTotalPrecipitation(totalSpringPrecipitation, 'Total Spring Wheat Precipitation');
+printTotalPrecipitation(totalWinterPrecipitation, 'Total Winter Wheat Precipitation');
