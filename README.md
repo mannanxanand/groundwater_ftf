@@ -1,4 +1,4 @@
-# Ground Water Analysis Dashboard
+# Geospatial Analysis for Farming Favorability
 
 This dashboard visualizes various aspects of groundwater and soil moisture data, focusing on their impact on wheat crops. The values obtained from this program were scraped to provide incentivizing insurance discounts for our HackPrinceton project, which led to my team's project "FarmShield" to win the **First Position** in **HackPrincetion 2024** organized by **MLH** and **Princeton University**.
 
@@ -47,4 +47,4 @@ Average Intensity of Sunlight (b/w 200-600) (W/m^2): 227.1743927001953
 
 ## Try It Yourself
 
-Visit [Ground Water Analysis Dashboard](https://mannanxanand.users.earthengine.app/view/ground-water-analysis) to give it a shot.
+Visit https://mannanxanand.users.earthengine.app/view/ground-water-analysis to give it a shot.
