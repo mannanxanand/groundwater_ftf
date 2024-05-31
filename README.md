@@ -13,7 +13,7 @@ This dashboard visualizes various aspects of groundwater and soil moisture data,
 ## Sample Output
 
 Click on the map to select an area of interest
-Coordinates: -95.639453, 44.609787
+Coordinates: -95.639453, 44.609787/n
 Precipitation over Wheat Season
 [Graph]
 
