@@ -26,13 +26,21 @@ Winter Temperature Over Time
 [Graph]
 
 Spring Wheat Area (hectares) - #d8b56b: 849.7158295450204
+
 Total Winter Wheat Precipitation: 2495.15 mm
+
 Winter Wheat Area (hectares) - #a57000: 4.163120086669921
+
 Durum Wheat Area (hectares) - #896054: 0
+
 Root Zone Soil Moisture Value (b/w 0.2-0.3): 0.31278911232948303
+
 Surface Soil Moisture Value (b/w 0.2-0.3): 0.2978968918323517
+
 Total Spring Wheat Precipitation: 2538.89 mm
+
 Average Intensity of Sunlight (b/w 200-600) (W/m^2): 76.26404571533203
+
 Average Intensity of Sunlight (b/w 200-600) (W/m^2): 227.1743927001953
 
 *Note: The b/w values indicate the ideal range for those parameters.*
